@@ -1,12 +1,10 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { WebSocketServer } from "ws";
 import { env } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { groupRoutes } from "./routes/groups.js";
 import { messageRoutes } from "./routes/messages.js";
-import { handleWebSocketConnection } from "./ws/server.js";
-
+import { WebSocketServer } from "ws";
 const app = Fastify({ logger: true });
 
 await app.register(cors, {
@@ -26,19 +24,17 @@ const wss = new WebSocketServer({ noServer: true });
 
 app.server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url ?? "", `http://${request.headers.host}`);
+  
   if (url.pathname !== "/ws") {
     socket.destroy();
     return;
   }
-
-  const token = url.searchParams.get("token");
-
+  
   wss.handleUpgrade(request, socket, head, (ws) => {
-    handleWebSocketConnection(ws, token);
+    console.log("WebSocket connection upgraded");
   });
 });
 
 console.log(`API listening on http://${env.HOST}:${env.PORT}`);
-console.log(`WebSocket available at ws://${env.HOST}:${env.PORT}/ws`);
 
 export { app, server };
