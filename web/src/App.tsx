@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthForm } from "./components/AuthForm";
 import { ChatRoom } from "./components/ChatRoom";
 import { GroupList } from "./components/GroupList";
 import { api, clearToken, getToken } from "./lib/api";
-import { ChatSocket } from "./lib/ws";
 import type { Group, User } from "./types";
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [booting, setBooting] = useState(true);
-
-  const socket = useMemo(() => new ChatSocket(), []);
 
   useEffect(() => {
     const token = getToken();
@@ -22,24 +19,16 @@ function App() {
 
     void api
       .me()
-      .then((res) => {
-        setUser(res.user);
-        socket.connect(token);
-      })
+      .then((res) => setUser(res.user))
       .catch(() => clearToken())
       .finally(() => setBooting(false));
-
-    return () => socket.disconnect();
-  }, [socket]);
+  }, []);
 
   function handleAuthSuccess(nextUser: User) {
-    const token = getToken();
-    if (token) socket.connect(token);
     setUser(nextUser);
   }
 
   function handleLogout() {
-    socket.disconnect();
     clearToken();
     setUser(null);
     setSelectedGroup(null);
@@ -84,7 +73,6 @@ function App() {
           <ChatRoom
             user={user}
             group={selectedGroup}
-            socket={socket}
             onBack={() => setSelectedGroup(null)}
           />
         ) : (

@@ -1,57 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { ChatMessage, Group, User } from "../types";
-import type { ChatSocket } from "../lib/ws";
 
 interface ChatRoomProps {
   user: User;
   group: Group;
-  socket: ChatSocket;
   onBack: () => void;
 }
 
-export function ChatRoom({ user, group, socket, onBack }: ChatRoomProps) {
+export function ChatRoom({ user, group, onBack }: ChatRoomProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [readBy, setReadBy] = useState<Record<string, string>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void api.listMessages(group.id).then((res) => setMessages(res.messages));
-    socket.join(group.id);
-
-    const unsubscribe = socket.on((msg) => {
-      if (msg.type === "message" && msg.message.groupId === group.id) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.message.id)) return prev;
-          return [...prev, msg.message];
-        });
-      }
-      if (msg.type === "read_receipt" && msg.groupId === group.id) {
-        setReadBy((prev) => ({ ...prev, [msg.userId]: msg.messageId }));
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      socket.leave(group.id);
-    };
-  }, [group.id, socket]);
+  }, [group.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    const last = messages[messages.length - 1];
-    if (last) {
-      socket.markRead(group.id, last.id);
-    }
-  }, [messages, group.id, socket]);
+  }, [messages]);
 
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    const text = input.trim();
-    if (!text) return;
-    socket.sendMessage(group.id, text);
-    setInput("");
+    // TODO: Issue #10 で WebSocket 経由の送信を実装
+    void input;
   }
 
   return (
@@ -66,6 +39,10 @@ export function ChatRoom({ user, group, socket, onBack }: ChatRoomProps) {
         </button>
         <h2 className="font-semibold">{group.name}</h2>
       </header>
+
+      <div className="mx-4 mt-4 rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        WebSocket 未実装のため、リアルタイム送受信・既読は利用できません（Issue #9, #10 参照）
+      </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((message) => {
@@ -101,23 +78,19 @@ export function ChatRoom({ user, group, socket, onBack }: ChatRoomProps) {
         <div ref={bottomRef} />
       </div>
 
-      {Object.keys(readBy).length > 0 && (
-        <p className="px-4 text-xs text-slate-400">
-          既読: {Object.keys(readBy).length} 人
-        </p>
-      )}
-
       <form onSubmit={handleSend} className="flex gap-2 border-t border-slate-100 p-4">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="メッセージを入力..."
+          placeholder="メッセージを入力...（WebSocket 実装後に有効）"
           className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+          disabled
         />
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          disabled
+          className="rounded-lg bg-blue-600 px-4 py-2 text-white opacity-50"
         >
           送信
         </button>
