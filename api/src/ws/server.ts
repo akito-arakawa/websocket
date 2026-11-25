@@ -1,4 +1,6 @@
 import type { WebSocket } from "ws";
+import { verifyToken } from "../middleware/auth.js";
+import { pl } from "zod/v4/locales";
 
 /**
  * WebSocket サーバー実装（自分で実装する）
@@ -21,6 +23,10 @@ export type ServerMessage =
   | { type: "read_receipt"; groupId: string; userId: string; messageId: string }
   | { type: "error"; message: string };
 
+interface AuthenticatedSocket extends WebSocket {
+    userId?: string;
+}
+
 export interface MessagePayload {
   id: string;
   groupId: string;
@@ -38,9 +44,23 @@ export async function handleWebSocketMessage(
 }
 
 export function handleWebSocketConnection(
-  socket: WebSocket,
+  socket: AuthenticatedSocket,
   _token: string | null,
 ): void {
-  // TODO: Issue #3, #4 で実装
-  socket.close(1011, "WebSocket not implemented yet");
+  if (!_token) {
+    socket.close(4001, "Missing token");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = verifyToken(_token);    
+  } catch (err) {
+    console.log("verify failed:", err); 
+    socket.close(4001, "Invalid token");
+    return;
+  }
+
+  socket.userId = payload.sub;
+  socket.send(JSON.stringify({ type: "connected", userId: payload.sub }));
 }

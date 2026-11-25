@@ -5,7 +5,10 @@ import { authRoutes } from "./routes/auth.js";
 import { groupRoutes } from "./routes/groups.js";
 import { messageRoutes } from "./routes/messages.js";
 import { WebSocketServer } from "ws";
+import { handleWebSocketConnection } from "./ws/server.js";
+
 const app = Fastify({ logger: true });
+
 
 await app.register(cors, {
   origin: env.CORS_ORIGIN,
@@ -24,13 +27,14 @@ const wss = new WebSocketServer({ noServer: true });
 
 app.server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url ?? "", `http://${request.headers.host}`);
+const token = url.searchParams.get("token");
   
   if (url.pathname !== "/ws") {
     socket.destroy();
     return;
   }
-  
   wss.handleUpgrade(request, socket, head, (ws) => {
+    handleWebSocketConnection(ws, token ?? null);
     console.log("WebSocket connection upgraded");
   });
 });
