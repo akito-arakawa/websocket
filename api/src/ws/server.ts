@@ -24,10 +24,32 @@ export type ServerMessage =
   | { type: "error"; message: string };
 
 interface AuthenticatedSocket extends WebSocket {
-    userId?: string;
+  userId?: string;
 }
 
 const rooms = new Map<string, Set<AuthenticatedSocket>>();
+
+function broadcast(
+  groupId: string,
+  message: ServerMessage,
+  exclude?: AuthenticatedSocket,
+) {
+  // 1. ルームを取り出す
+  const room = rooms.get(groupId); // Set { socketA, socketB, socketC }
+  if (!room) return;
+
+  // 2. 文字列にする（全員同じ内容なので1回だけ）
+  const data = JSON.stringify(message);
+
+  // 3. ルームの socket を1つずつ取り出す
+  for (const client of room) {
+    // 4. 送ってよい相手にだけ送る
+    if (client === exclude) continue; // 除外対象なら、次の人へ
+    if (client.readyState === client.OPEN) {
+      client.send(data);
+    }
+  }
+}
 
 export interface MessagePayload {
   id: string;
@@ -44,10 +66,10 @@ export async function handleWebSocketMessage(
 ): Promise<void> {
   let message: ClientMessage;
   try {
-  message = JSON.parse(raw);
+    message = JSON.parse(raw);
   } catch {
-  socket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
-  return;
+    socket.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+    return;
   }
   const groupId = message.groupId;
   const userId = socket.userId;
@@ -57,12 +79,14 @@ export async function handleWebSocketMessage(
       [groupId, userId],
     );
     if (result.rows.length === 0) {
-      socket.send(JSON.stringify({ type: "error", message: "Not a group member" }));
+      socket.send(
+        JSON.stringify({ type: "error", message: "Not a group member" }),
+      );
       return;
     }
 
     let room = rooms.get(groupId);
-    if(!room) {
+    if (!room) {
       room = new Set<AuthenticatedSocket>();
       rooms.set(groupId, room);
     }
@@ -88,9 +112,9 @@ export function handleWebSocketConnection(
 
   let payload;
   try {
-    payload = verifyToken(token);    
+    payload = verifyToken(token);
   } catch (err) {
-    console.log("verify failed:", err); 
+    console.log("verify failed:", err);
     socket.close(4001, "Invalid token");
     return;
   }
@@ -98,13 +122,15 @@ export function handleWebSocketConnection(
   socket.userId = payload.sub;
   socket.send(JSON.stringify({ type: "connected", userId: payload.sub }));
 
-  socket.on("message",(data) => {
-    handleWebSocketMessage(socket, data.toString()).catch((err) => console.error(err));
-  })
+  socket.on("message", (data) => {
+    handleWebSocketMessage(socket, data.toString()).catch((err) =>
+      console.error(err),
+    );
+  });
 
-  socket.on("close",() => {
+  socket.on("close", () => {
     for (const [, room] of rooms) {
       room.delete(socket);
     }
-  })
+  });
 }
