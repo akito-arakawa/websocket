@@ -1,6 +1,6 @@
 import type { WebSocket } from "ws";
 import { verifyToken } from "../middleware/auth.js";
-import { pl } from "zod/v4/locales";
+import { query } from "../db/index.js";
 
 /**
  * WebSocket サーバー実装（自分で実装する）
@@ -27,8 +27,6 @@ interface AuthenticatedSocket extends WebSocket {
   userId?: string;
 }
 
-<<<<<<< Updated upstream
-=======
 const rooms = new Map<string, Set<AuthenticatedSocket>>();
 
 function broadcast(
@@ -53,7 +51,6 @@ function broadcast(
   }
 }
 
->>>>>>> Stashed changes
 export interface MessagePayload {
   id: string;
   groupId: string;
@@ -64,12 +61,9 @@ export interface MessagePayload {
 }
 
 export async function handleWebSocketMessage(
-  _socket: WebSocket,
-  _raw: string,
+  socket: AuthenticatedSocket,
+  raw: string,
 ): Promise<void> {
-<<<<<<< Updated upstream
-  // TODO: Issue #5 以降で実装
-=======
   let message: ClientMessage;
   try {
     message = JSON.parse(raw);
@@ -105,25 +99,20 @@ export async function handleWebSocketMessage(
     rooms.get(groupId)?.delete(socket);
     socket.send(JSON.stringify({ type: "left", groupId }));
   }
->>>>>>> Stashed changes
 }
 
 export function handleWebSocketConnection(
   socket: AuthenticatedSocket,
-  _token: string | null,
+  token: string | null,
 ): void {
-  if (!_token) {
+  if (!token) {
     socket.close(4001, "Missing token");
     return;
   }
 
   let payload;
   try {
-<<<<<<< Updated upstream
-    payload = verifyToken(_token);    
-=======
     payload = verifyToken(token);
->>>>>>> Stashed changes
   } catch (err) {
     console.log("verify failed:", err);
     socket.close(4001, "Invalid token");
@@ -132,8 +121,6 @@ export function handleWebSocketConnection(
 
   socket.userId = payload.sub;
   socket.send(JSON.stringify({ type: "connected", userId: payload.sub }));
-<<<<<<< Updated upstream
-=======
 
   socket.on("message", (data) => {
     handleWebSocketMessage(socket, data.toString()).catch((err) =>
@@ -146,5 +133,4 @@ export function handleWebSocketConnection(
       room.delete(socket);
     }
   });
->>>>>>> Stashed changes
 }
